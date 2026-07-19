@@ -30,4 +30,13 @@ type Storage interface {
 		userEmail string,
 		items []models.OrderItem,
 	) (int, error)
+
+	GetUserOrderHistory(
+		ctx context.Context,
+		email string,
+	) ([]models.OrderDetail, error)
+
+	GetPopularProducts(
+		ctx context.Context,
+	) ([]models.PopularProduct, error)
 }

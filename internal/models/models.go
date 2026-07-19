@@ -29,3 +29,19 @@ type OrderItem struct {
 	ProductID int
 	Quantity  int
 }
+
+type OrderDetail struct {
+	OrderID     int
+	UserEmail   string
+	ProductName string
+	Quantity    int
+	Amount      float64
+	Status      string
+	CreatedAt   time.Time
+}
+
+type PopularProduct struct {
+	ProductID   int
+	ProductName string
+	TotalSold   int
+}
