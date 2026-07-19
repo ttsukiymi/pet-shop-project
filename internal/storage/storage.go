@@ -24,4 +24,10 @@ type Storage interface {
 	GetOrderByID(ctx context.Context, id int) (models.Order, error)
 	GetOrdersByUserEmail(ctx context.Context, email string) ([]models.Order, error)
 	GetOrderItemsByOrderID(ctx context.Context, orderID int) ([]models.OrderItem, error)
+
+	PlaceOrder(
+		ctx context.Context,
+		userEmail string,
+		items []models.OrderItem,
+	) (int, error)
 }
