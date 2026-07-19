@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"go-pet-shop/internal/models"
+
+	"github.com/jackc/pgx/v5"
 )
 
 var (
@@ -77,7 +79,6 @@ func (s *Storage) DeleteProduct(ctx context.Context, id int) error {
 	return nil
 }
 
-// UpdateProduct - обновляет продукт
 func (s *Storage) UpdateProduct(ctx context.Context, p models.Product) error {
 	const fn = "storage.postgres.product.UpdateProduct"
 
@@ -93,4 +94,31 @@ func (s *Storage) UpdateProduct(ctx context.Context, p models.Product) error {
 	}
 
 	return nil
+}
+
+func (s *Storage) GetProductByID(ctx context.Context, id int) (models.Product, error) {
+	const fn = "storage.postgres.product.GetProductByID"
+
+	var product models.Product
+
+	err := s.db.QueryRow(
+		ctx,
+		`SELECT id, name, price, stock FROM products WHERE id = $1`,
+		id,
+	).Scan(
+		&product.ID,
+		&product.Name,
+		&product.Price,
+		&product.Stock,
+	)
+
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return models.Product{}, fmt.Errorf("%s: %w", fn, ErrNotFound)
+		}
+
+		return models.Product{}, fmt.Errorf("%s: %w", fn, err)
+	}
+
+	return product, nil
 }
