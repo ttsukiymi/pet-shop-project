@@ -20,7 +20,17 @@ func (s *Storage) PlaceOrder(
 		return 0, errors.New("order items are empty")
 	}
 
+	for _, item := range items {
+		if item.Quantity <= 0 {
+			return 0, fmt.Errorf(
+				"invalid quantity for product %d",
+				item.ProductID,
+			)
+		}
+	}
+
 	tx, err := s.db.Begin(ctx)
+
 	if err != nil {
 		return 0, fmt.Errorf("%s: begin transaction: %w", fn, err)
 	}

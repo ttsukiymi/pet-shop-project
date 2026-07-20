@@ -1,9 +1,9 @@
 CREATE TABLE orders (
     id SERIAL PRIMARY KEY,
-    customer_id INT NOT NULL REFERENCES users(id),
-    created_at TIMESTAMP DEFAULT NOW()
+    user_id INT NOT NULL REFERENCES users(id),
+    total_price NUMERIC NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
-
 
 CREATE TABLE order_items (
     id SERIAL PRIMARY KEY,

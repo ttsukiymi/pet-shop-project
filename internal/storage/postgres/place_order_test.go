@@ -9,6 +9,8 @@ import (
 func TestPlaceOrder(t *testing.T) {
 	ctx := context.Background()
 
+	email := "arina_place_order_test@test.com"
+
 	storage, err := New(
 		ctx,
 		"postgres://postgres:471300@localhost:5432/postgres?sslmode=disable",
@@ -20,12 +22,31 @@ func TestPlaceOrder(t *testing.T) {
 
 	defer storage.Close()
 
+	err = storage.CreateUser(ctx, models.User{
+		Name:  "Arina",
+		Email: email,
+	})
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	productID, err := storage.CreateProduct(ctx, models.Product{
+		Name:  "Dog Food",
+		Price: 25.5,
+		Stock: 10,
+	})
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	orderID, err := storage.PlaceOrder(
 		ctx,
-		"arina@test.com",
+		email,
 		[]models.OrderItem{
 			{
-				ProductID: 1,
+				ProductID: productID,
 				Quantity:  2,
 			},
 		},
