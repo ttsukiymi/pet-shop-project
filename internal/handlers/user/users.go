@@ -40,7 +40,7 @@ func (h *Handler) CreateUser(w http.ResponseWriter, r *http.Request) {
 	var user models.User
 
 	if err := render.DecodeJSON(r.Body, &user); err != nil {
-		log.Error("failed to decode body", slog.Any("error", err))
+		log.Error("failed to decode request body", slog.Any("error", err))
 
 		w.WriteHeader(http.StatusBadRequest)
 		render.JSON(w, r, map[string]string{
@@ -50,6 +50,8 @@ func (h *Handler) CreateUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if user.Name == "" || user.Email == "" {
+		log.Error("name or email is empty")
+
 		w.WriteHeader(http.StatusBadRequest)
 		render.JSON(w, r, map[string]string{
 			"error": "name and email are required",
@@ -57,9 +59,7 @@ func (h *Handler) CreateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err := h.storage.CreateUser(r.Context(), user)
-
-	if err != nil {
+	if err := h.storage.CreateUser(r.Context(), user); err != nil {
 		log.Error("failed to create user", slog.Any("error", err))
 
 		w.WriteHeader(http.StatusInternalServerError)
@@ -69,6 +69,13 @@ func (h *Handler) CreateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	log.Info(
+		"user created successfully",
+		slog.String("email", user.Email),
+	)
+
+	w.WriteHeader(http.StatusCreated)
+
 	render.JSON(w, r, map[string]interface{}{
 		"status": "user created",
 		"user":   user,
@@ -76,17 +83,28 @@ func (h *Handler) CreateUser(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) GetAllUsers(w http.ResponseWriter, r *http.Request) {
+	const fn = "handlers.user.GetAllUsers"
+
+	log := h.log.With(
+		slog.String("fn", fn),
+		slog.String("request_id", middleware.GetReqID(r.Context())),
+	)
 
 	users, err := h.storage.GetAllUsers(r.Context())
-
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
+		log.Error("failed to get users", slog.Any("error", err))
 
+		w.WriteHeader(http.StatusInternalServerError)
 		render.JSON(w, r, map[string]string{
 			"error": "failed to get users",
 		})
 		return
 	}
+
+	log.Info(
+		"users retrieved successfully",
+		slog.Int("count", len(users)),
+	)
 
 	render.JSON(w, r, users)
 }
@@ -102,8 +120,9 @@ func (h *Handler) GetUserByEmail(w http.ResponseWriter, r *http.Request) {
 	email := chi.URLParam(r, "email")
 
 	if email == "" {
-		w.WriteHeader(http.StatusBadRequest)
+		log.Error("email is empty")
 
+		w.WriteHeader(http.StatusBadRequest)
 		render.JSON(w, r, map[string]string{
 			"error": "email is required",
 		})
@@ -111,17 +130,20 @@ func (h *Handler) GetUserByEmail(w http.ResponseWriter, r *http.Request) {
 	}
 
 	user, err := h.storage.GetUserByEmail(r.Context(), email)
-
 	if err != nil {
 		log.Error("failed to get user", slog.Any("error", err))
 
 		w.WriteHeader(http.StatusNotFound)
-
 		render.JSON(w, r, map[string]string{
 			"error": "user not found",
 		})
 		return
 	}
+
+	log.Info(
+		"user found",
+		slog.String("email", user.Email),
+	)
 
 	render.JSON(w, r, user)
 }

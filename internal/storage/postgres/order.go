@@ -117,7 +117,8 @@ func (s *Storage) GetOrderByID(ctx context.Context, id int) (models.Order, error
 		`
 		SELECT 
 			id,
-			customer_id,
+			user_id,
+			total_price,
 			created_at
 		FROM orders
 		WHERE id = $1
@@ -126,6 +127,7 @@ func (s *Storage) GetOrderByID(ctx context.Context, id int) (models.Order, error
 	).Scan(
 		&order.ID,
 		&order.UserID,
+		&order.TotalPrice,
 		&order.CreatedAt,
 	)
 
@@ -150,12 +152,13 @@ func (s *Storage) GetOrdersByUserEmail(ctx context.Context, email string) ([]mod
 		ctx,
 		`
 		SELECT
-			orders.id,
-			orders.customer_id,
-			orders.created_at
+			id,
+			user_id,
+			total_price,
+			created_at
 		FROM orders
 		JOIN users
-			ON users.id = orders.customer_id
+			ON users.id = orders.user_id
 		WHERE users.email = $1
 		ORDER BY orders.created_at DESC
 		`,
@@ -176,6 +179,7 @@ func (s *Storage) GetOrdersByUserEmail(ctx context.Context, email string) ([]mod
 		err := rows.Scan(
 			&order.ID,
 			&order.UserID,
+			&order.TotalPrice,
 			&order.CreatedAt,
 		)
 

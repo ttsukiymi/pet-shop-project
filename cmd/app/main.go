@@ -4,6 +4,10 @@ import (
 	"context"
 	"go-pet-shop/internal/config"
 	"go-pet-shop/internal/handlers"
+	"go-pet-shop/internal/handlers/checkout"
+	"go-pet-shop/internal/handlers/history"
+	"go-pet-shop/internal/handlers/order"
+	"go-pet-shop/internal/handlers/popular"
 	"go-pet-shop/internal/handlers/product"
 	"go-pet-shop/internal/handlers/user"
 	"go-pet-shop/internal/lib/logger"
@@ -22,30 +26,39 @@ import (
 func main() {
 	cfg := config.MustLoad()
 
-	// Settings logger
 	log := logger.SetupLogger(cfg.Env)
-	log.Info("starting the project...", slog.String("env", cfg.Env))
+	log.Info("starting the project...",
+		slog.String("env", cfg.Env),
+	)
 
-	// Settings and started database
-	ctx, cancel := context.WithTimeout(context.Background(), cfg.DatabaseTimeout)
+	ctx, cancel := context.WithTimeout(
+		context.Background(),
+		cfg.DatabaseTimeout,
+	)
 	defer cancel()
 
 	storage, err := postgres.New(ctx, cfg.DatabaseURL)
 	if err != nil {
-		log.Error("failed to init storage", slog.String("error", err.Error()))
+		log.Error(
+			"failed to init storage",
+			slog.String("error", err.Error()),
+		)
 		os.Exit(1)
 	}
+
 	defer func() {
 		if err := storage.Close(); err != nil {
-			log.Error("failed to close storage", slog.String("error", err.Error()))
+			log.Error(
+				"failed to close storage",
+				slog.String("error", err.Error()),
+			)
 		}
+
 		log.Info("storage closed")
 	}()
 
-	// Init router
 	router := chi.NewRouter()
 
-	// Middlewares
 	router.Use(middleware.RequestID)
 	router.Use(middleware.Recoverer)
 	router.Use(middleware.URLFormat)
@@ -54,21 +67,91 @@ func main() {
 	// Handlers
 	productHandler := product.New(log, storage)
 	userHandler := user.New(log, storage)
+	orderHandler := order.New(log, storage)
 
+	checkoutHandler := checkout.New(storage)
+	historyHandler := history.New(storage)
+	popularHandler := popular.New(storage)
+
+	// Health
 	router.Get("/health", handlers.StatusHandler)
 
 	// Products
-	router.Get("/products", productHandler.GetAllProducts)
-	router.Post("/products", productHandler.CreateProduct)
-	router.Delete("/products/{id}", productHandler.DeleteProduct)
-	router.Put("/products/{id}", productHandler.UpdateProduct)
+	router.Get(
+		"/products/popular",
+		popularHandler.GetPopularProducts,
+	)
+
+	router.Get(
+		"/products",
+		productHandler.GetAllProducts,
+	)
+
+	router.Get(
+		"/products/{id}",
+		productHandler.GetProductByID,
+	)
+
+	router.Post(
+		"/products",
+		productHandler.CreateProduct,
+	)
+
+	router.Delete(
+		"/products/{id}",
+		productHandler.DeleteProduct,
+	)
+
+	router.Put(
+		"/products/{id}",
+		productHandler.UpdateProduct,
+	)
 
 	// Users
-	router.Post("/users", userHandler.CreateUser)
-	router.Get("/users", userHandler.GetAllUsers)
-	router.Get("/users/{email}", userHandler.GetUserByEmail)
+	router.Post(
+		"/users",
+		userHandler.CreateUser,
+	)
 
-	// Settings and started server
+	router.Get(
+		"/users",
+		userHandler.GetAllUsers,
+	)
+
+	// history
+	router.Get(
+		"/users/{email}/history",
+		historyHandler.GetUserHistory,
+	)
+
+	router.Get(
+		"/users/{email}",
+		userHandler.GetUserByEmail,
+	)
+
+	// Orders
+	router.Post(
+		"/orders",
+		orderHandler.CreateOrder,
+	)
+
+	router.Get(
+		"/orders/{id}",
+		orderHandler.GetOrderByID,
+	)
+
+	router.Post(
+		"/orders/{id}/items",
+		orderHandler.AddOrderItem,
+	)
+
+	// Checkout
+	router.Post(
+		"/checkout",
+		checkoutHandler.Checkout,
+	)
+
+	// Server
 	srv := &http.Server{
 		Addr:         cfg.HTTPServer.Address,
 		Handler:      router,
@@ -77,28 +160,48 @@ func main() {
 		IdleTimeout:  cfg.HTTPServer.IdleTimeout,
 	}
 
-	// Запуск сервера в горутине для graceful shutdown
 	go func() {
-		log.Info("Starting server on", slog.String("address", cfg.HTTPServer.Address))
-		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Error("Server error", slog.String("error", err.Error()))
+		log.Info(
+			"Starting server on",
+			slog.String("address", cfg.HTTPServer.Address),
+		)
+
+		if err := srv.ListenAndServe(); err != nil &&
+			err != http.ErrServerClosed {
+
+			log.Error(
+				"Server error",
+				slog.String("error", err.Error()),
+			)
+
 			os.Exit(1)
 		}
 	}()
 
-	// Graceful shutdown
 	stop := make(chan os.Signal, 1)
-	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
 
-	<-stop // Ждем сигнал завершения
+	signal.Notify(
+		stop,
+		os.Interrupt,
+		syscall.SIGTERM,
+	)
+
+	<-stop
 
 	log.Info("Shutting down server...")
 
-	ctx, cancel = context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel = context.WithTimeout(
+		context.Background(),
+		10*time.Second,
+	)
+
 	defer cancel()
 
 	if err := srv.Shutdown(ctx); err != nil {
-		log.Error("Server shutdown error", slog.String("error", err.Error()))
+		log.Error(
+			"Server shutdown error",
+			slog.String("error", err.Error()),
+		)
 	}
 
 	log.Info("Server stopped gracefully")
